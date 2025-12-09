@@ -1,0 +1,48 @@
+name: LINE Notify Test
+
+on:
+  workflow_dispatch:  # 手動実行用
+
+jobs:
+  line-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Send LINE test message
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: |
+          import os
+          import requests
+
+          token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+          user = os.getenv("LINE_USER_ID")
+
+          if not token or not user:
+              print("❌ Secrets が設定されていません")
+              exit(1)
+
+          url = "https://api.line.me/v2/bot/message/push"
+          headers = {
+              "Content-Type": "application/json",
+              "Authorization": f"Bearer {token}"
+          }
+          payload = {
+              "to": user,
+              "messages": [{"type": "text", "text": "LINE Bot 通知テスト：GitHub Actions から送信成功！"}]
+          }
+
+          r = requests.post(url, headers=headers, json=payload)
+          print("Status:", r.status_code)
+          print("Response:", r.text)
+
+          if r.status_code == 200:
+              print("✅ LINE へ通知成功！")
+          else:
+              print("❌ LINE への通知失敗")
