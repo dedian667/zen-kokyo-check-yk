@@ -1,5 +1,8 @@
 name: Monitor Yokohama Events
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: "*/5 * * * *"
