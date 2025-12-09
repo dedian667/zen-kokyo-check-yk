@@ -1,41 +1,52 @@
 import requests
 from bs4 import BeautifulSoup
 import os
-import hashlib
+import re
 
 TARGET_URL = "https://event.zenko-kyo.or.jp/eventList"
-STATE_FILE = "state_hash.txt"
+STATE_FILE = "yokohama_dates.txt"
+
 
 def fetch_html():
     r = requests.get(TARGET_URL, timeout=20)
     r.raise_for_status()
     return r.text
 
-def extract_yokohama_counts(html):
+
+def extract_yokohama_dates(html):
+    """
+    横浜エリア｜ 11月15日開催
+    のような形式の日付だけを抽出する
+    """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text()
-    count = text.count("横浜エリア")
-    return count
 
-def compute_hash(count):
-    return hashlib.sha256(str(count).encode()).hexdigest()
+    # 正規表現で「横浜エリア｜ ◯月◯日開催」を抽出
+    pattern = r"横浜エリア[^\d]*(\d{1,2}月\d{1,2}日)開催"
+    dates = re.findall(pattern, text)
 
-def load_prev_hash():
+    return sorted(set(dates))  # 重複削除＆ソート
+
+
+def load_previous_dates():
     if not os.path.exists(STATE_FILE):
-        return None
+        return []
     with open(STATE_FILE, "r", encoding="utf-8") as f:
-        return f.read().strip()
+        return [line.strip() for line in f.readlines() if line.strip()]
 
-def save_hash(h):
+
+def save_dates(dates):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        f.write(h)
+        for d in dates:
+            f.write(d + "\n")
+
 
 def send_line_message(msg):
     token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-    user_id = os.getenv("LINE_USER_ID")
+    user = os.getenv("LINE_USER_ID")
 
-    if not token or not user_id:
-        print("LINE token or user ID missing.")
+    if not token or not user:
+        print("❌ LINE token or userId が設定されていません")
         return
 
     url = "https://api.line.me/v2/bot/message/push"
@@ -44,25 +55,35 @@ def send_line_message(msg):
         "Authorization": f"Bearer {token}"
     }
     payload = {
-        "to": user_id,
+        "to": user,
         "messages": [{"type": "text", "text": msg}]
     }
-    requests.post(url, headers=headers, json=payload)
+
+    r = requests.post(url, headers=headers, json=payload)
+    print("LINE Response:", r.status_code, r.text)
+
 
 def main():
     html = fetch_html()
-    count = extract_yokohama_counts(html)
-    new_hash = compute_hash(count)
+    new_dates = extract_yokohama_dates(html)
+    old_dates = load_previous_dates()
 
-    prev_hash = load_prev_hash()
+    print("検出された日付:", new_dates)
+    print("保存されていた日付:", old_dates)
 
-    if prev_hash != new_hash:
-        msg = f"横浜エリアの件数が変化しました: {count}件"
+    # 差分を抽出
+    added = [d for d in new_dates if d not in old_dates]
+
+    if added:
+        msg = "【新規 横浜エリアイベント】\n" + "\n".join(added)
         send_line_message(msg)
-        save_hash(new_hash)
-        print("Updated and notified.")
+        print("新規イベント通知:", added)
     else:
-        print("No change detected.")
+        print("新規イベントなし")
+
+    # 状態保存
+    save_dates(new_dates)
+
 
 if __name__ == "__main__":
     main()
