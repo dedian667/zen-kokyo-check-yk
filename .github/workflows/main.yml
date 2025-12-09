@@ -1,23 +1,16 @@
 name: LINE Notify Test
 
 on:
-  workflow_dispatch:  # 手動実行用
+  workflow_dispatch:  # 手動実行
 
 jobs:
   line-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Send LINE test message
-        env:
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+      - name: Create test python file
         run: |
+          cat << 'EOF' > test_line.py
           import os
           import requests
 
@@ -46,3 +39,18 @@ jobs:
               print("✅ LINE へ通知成功！")
           else:
               print("❌ LINE への通知失敗")
+          EOF
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run test
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python test_line.py
