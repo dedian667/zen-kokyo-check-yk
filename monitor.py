@@ -14,18 +14,24 @@ def fetch_html():
 
 
 def extract_yokohama_dates(html):
-    """
-    横浜エリア｜ 11月15日開催
-    のような形式の日付だけを抽出する
-    """
     soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text()
+    dates = set()
 
-    # 正規表現で「横浜エリア｜ ◯月◯日開催」を抽出
-    pattern = r"横浜エリア[^\d]*(\d{1,2}月\d{1,2}日)開催"
-    dates = re.findall(pattern, text)
+    for box in soup.select("div.service-box"):
+        text = box.get_text(separator=" ", strip=True)
 
-    return sorted(set(dates))  # 重複削除＆ソート
+        if "横浜エリア" not in text:
+            continue
+
+        match = re.search(
+            r"(\d{4}年)?(\d{1,2}月\d{1,2}日)",
+            text
+        )
+
+        if match:
+            dates.add(match.group(2))
+
+    return sorted(dates)
 
 
 def load_previous_dates():
